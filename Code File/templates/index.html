@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scrapy by PARVEJ</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- Top Bar -->
+  <div class="app-topbar">
+    <div class="logo">
+      <div class="dot-row">
+        <span class="dot dot-red"></span>
+        <span class="dot dot-amber"></span>
+        <span class="dot dot-green"></span>
+      </div>
+      <h1>SCHOLAR SCRAPER // DASHBOARD</h1>
+    </div>
+    <div class="live-status">
+      <span class="live-dot" id="liveDot"></span>
+      <span id="liveText">IP: IDLE â€” Not connected</span>
+    </div>
+  </div>
+
+  <!-- Two-column body -->
+  <div class="app-body">
+
+    <!-- â•â• LEFT: Configuration Panel â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <div class="win-panel">
+      <div class="win-title"><span>&#9881;</span> CONFIGURATION</div>
+      <div class="win-body scrollable">
+
+        <!-- â”€â”€ 1. Query Builder â”€â”€ -->
+        <div class="cfg-label">SEARCH QUERY BUILDER</div>
+        <div class="qb-wrap" id="queryBuilder">
+          <div class="qb-row" id="qbMainRow">
+            <span class="qb-badge must">MUST</span>
+            <input class="qb-input" id="qbMain" type="text"
+              placeholder="e.g. riverbank erosion  (comma = OR)" oninput="updatePreview()">
+          </div>
+          <div id="qbConditions"></div>
+          <div class="qb-add-row">
+            <button class="qb-add-btn and" onclick="addCondition('AND')">+ AND</button>
+            <button class="qb-add-btn or"  onclick="addCondition('OR')">+ OR</button>
+          </div>
+          <div class="qb-preview" id="qbPreview">Query will appear hereâ€¦</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- â”€â”€ 2. Limits row (Max Â· Year From Â· Year To Â· Open Access) â”€â”€ -->
+        <div class="limits-row">
+          <div class="lim-group">
+            <label>MAX</label>
+            <input type="number" id="max_results" placeholder="unlimit">
+          </div>
+          <div class="lim-group">
+            <label>FROM</label>
+            <input type="number" id="year_low" placeholder="Year">
+          </div>
+          <div class="lim-group">
+            <label>TO</label>
+            <input type="number" id="year_high" placeholder="Year">
+          </div>
+          <div class="lim-group oa-group">
+            <label>OA</label>
+            <label class="toggle-wrap">
+              <input type="checkbox" id="open_access">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- â”€â”€ 3. Quality Filters â”€â”€ -->
+
+        <!-- Quartile chips -->
+        <div class="filter-row-label">Quartile (select any)</div>
+        <div class="chip-row" id="quartileChips">
+          <button class="chip" data-value="Q1" onclick="toggleChip(this)">Q1</button>
+          <button class="chip" data-value="Q2" onclick="toggleChip(this)">Q2</button>
+          <button class="chip" data-value="Q3" onclick="toggleChip(this)">Q3</button>
+          <button class="chip" data-value="Q4" onclick="toggleChip(this)">Q4</button>
+          <button class="chip" data-value="N/A" onclick="toggleChip(this)">N/A</button>
+        </div>
+
+        <!-- Numeric threshold row -->
+        <div class="numeric-row">
+          <div class="num-group">
+            <label>H-INDEX &#x2265;</label>
+            <input type="number" id="min_h_index" placeholder="e.g. 50" min="0">
+          </div>
+          <div class="num-group">
+            <label>SJR &#x2265;</label>
+            <input type="number" id="min_sjr" placeholder="e.g. 0.5" min="0" step="0.01">
+          </div>
+          <div class="num-group">
+            <label>CITATIONS &#x2265;</label>
+            <input type="number" id="min_citations" placeholder="e.g. 10" min="0">
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- â”€â”€ 4. Journal / Publisher Filter â”€â”€ -->
+        <div id="journalFields"></div>
+        <div id="publisherFields"></div>
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <button class="filter-add-btn" onclick="addFilterField('journal')">+ Add Journal</button>
+          <button class="filter-add-btn" onclick="addFilterField('publisher')">+ Add Publisher</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- â”€â”€ 6. Action buttons (one row) â”€â”€ -->
+        <div class="btn-row">
+          <button id="startBtn" class="btn btn-primary" onclick="handleMainButton()">&#9654; RUN</button>
+          <a href="/preview" target="_blank" class="btn btn-secondary btn-icon" title="View Live Data Table">&#9776;</a>
+          <a href="/download" class="btn btn-ghost btn-icon" title="Download CSV">&#11015;</a>
+        </div>
+
+        <div class="status-bar">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">Idle â€” ready to run</span>
+        </div>
+
+      </div><!-- /win-body -->
+    </div><!-- /left panel -->
+
+    <!-- â•â• RIGHT: Terminal Panel â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <div class="win-panel terminal-panel">
+      <div class="win-title"><span>&#9654;</span> LIVE OUTPUT TERMINAL</div>
+      <div class="terminal-wrap">
+        <div class="terminal-path" style="display:none;"></div>
+        <div class="terminal" id="terminal"></div>
+        <div class="terminal-footer">
+          <span class="term-prompt">scholar@scraper:~$</span>
+          <span id="termStatus">IDLE</span>
+          <span style="margin-left:auto;" id="paperCount"></span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /app-body -->
+</div><!-- /app-shell -->
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+
+
+

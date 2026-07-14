@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Scrapy by PARVEJ - Live Data</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .page-data { max-width: 100%; padding: 24px; height: 100vh; display: flex; flex-direction: column; }
+    body { justify-content: flex-start; margin: 0; height: 100vh; overflow: hidden; }
+    
+    /* Make top buttons and text white */
+    .top-text-white { color: #ffffff !important; }
+    .btn-ghost-white { background: transparent; color: #ffffff !important; border-color: rgba(255,255,255,0.4); }
+    .btn-ghost-white:hover { background: rgba(255,255,255,0.1); border-color: #ffffff; }
+
+    /* Increase table container height */
+    .win-panel-flex { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-top: 0; }
+    .tbl-container { flex: 1; overflow-y: auto; max-height: none; }
+
+    /* Sortable headers */
+    th { cursor: pointer; user-select: none; position: relative; }
+    th:hover { background: rgba(0,0,0,0.1); }
+    th::after { content: '\2195'; margin-left: 5px; opacity: 0.3; font-size: 0.8em; }
+    th.sort-asc::after { content: '\2191'; opacity: 1; }
+    th.sort-desc::after { content: '\2193'; opacity: 1; }
+
+    /* Tooltip */
+    #tooltip {
+      position: fixed;
+      background: #E7E2D9;
+      color: #000000;
+      padding: 16px;
+      border-radius: 6px;
+      border: 1px solid rgba(0,0,0,0.1);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      width: max-content;
+      max-width: 800px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 9999;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      line-height: 1.5;
+    }
+    #tooltip strong { color: #000000; font-weight: bold; font-size: 0.8rem; }
+    #tooltip.visible { opacity: 1; }
+  </style>
+</head>
+<body>
+<div class="app-shell page-data">
+
+  <div class="app-topbar">
+    <div class="logo">
+      <div class="dot-row">
+        <span class="dot dot-red"></span>
+        <span class="dot dot-amber"></span>
+        <span class="dot dot-green"></span>
+      </div>
+      <h1>SCHOLAR SCRAPER // LIVE DATA VIEW</h1>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <span class="badge top-text-white" id="rowCount" style="background:transparent; border:none; font-size:0.8rem;">0 rows</span>
+      <a href="/" class="btn btn-ghost-white" style="width:auto;margin:0;padding:6px 14px;">&#8592; BACK</a>
+      <a href="/download" class="btn btn-ghost-white" style="width:auto;margin:0;padding:6px 14px;">&#11015; CSV</a>
+    </div>
+  </div>
+
+  <div class="win-panel win-panel-flex" style="padding-top: 0; overflow: hidden;">
+    <div class="tbl-container">
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th onclick="sortTable(0, 'num')">#</th>
+            <th onclick="sortTable(1, 'str')">TITLE</th>
+            <th onclick="sortTable(2, 'num')">YEAR</th>
+            <th onclick="sortTable(3, 'str')">JOURNAL</th>
+            <th onclick="sortTable(4, 'str')">QUARTILE</th>
+            <th onclick="sortTable(5, 'num')">H-INDEX</th>
+            <th onclick="sortTable(6, 'num')">SJR</th>
+            <th onclick="sortTable(7, 'num')">CITATIONS</th>
+            <th onclick="sortTable(8, 'str')">PUBLISHER</th>
+            <th onclick="sortTable(9, 'str')">OPEN ACCESS</th>
+            <th onclick="sortTable(10, 'str')">COUNTRY</th>
+            <th>LINK</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Tooltip Element -->
+<div id="tooltip"></div>
+
+<script>
+let currentData = [];
+let sortCol = -1;
+let sortAsc = true;
+
+function getBadge(q) {
+  if (!q || q === 'N/A') return '<span class="badge-na">N/A</span>';
+  if (q === 'Q1') return '<span class="badge-q1">Q1</span>';
+  if (q === 'Q2') return '<span class="badge-q2">Q2</span>';
+  if (q === 'Q3') return '<span class="badge-q3">Q3</span>';
+  if (q === 'Q4') return '<span class="badge-q4">Q4</span>';
+  return '<span class="badge-na">' + q + '</span>';
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  document.getElementById('rowCount').textContent = currentData.length + ' rows';
+  
+  currentData.forEach((row, idx) => {
+    // Escape quotes for HTML attributes safely
+    const titleEsc = (row.Title||'N/A').replace(/"/g, '&quot;');
+    const abstractEsc = (row['Abstract/Snippet']||'No abstract').replace(/"/g, '&quot;');
+    
+    const link = row['Paper Link'] && row['Paper Link'] !== 'N/A'
+      ? '<a href="' + row['Paper Link'] + '" target="_blank" style="color:#3d5a99;">&#8599;</a>' : '—';
+      
+    tbody.innerHTML += '<tr>'
+      + '<td>' + (row.originalIndex) + '</td>'
+      + '<td class="title-cell" data-fulltitle="' + titleEsc + '" data-abstract="' + abstractEsc + '">' 
+      + (row.Title||'N/A').substring(0,60) + '…</td>'
+      + '<td>' + (row.Year||'N/A') + '</td>'
+      + '<td title="' + (row['Journal/Venue (Scholar)']||'').replace(/"/g, '&quot;') + '">' + (row['Journal/Venue (Scholar)']||'N/A').substring(0,28) + '</td>'
+      + '<td>' + getBadge(row['Quartile (SCImago)']) + '</td>'
+      + '<td>' + (row['H-index (SCImago)']||'N/A') + '</td>'
+      + '<td>' + (row['SJR Score (SCImago)']||'N/A') + '</td>'
+      + '<td>' + (row['Citations Count']||'0') + '</td>'
+      + '<td title="' + (row.Publisher||'').replace(/"/g, '&quot;') + '">' + (row.Publisher||'N/A').substring(0,22) + '</td>'
+      + '<td>' + (row['Open Access']||'N/A') + '</td>'
+      + '<td>' + (row['Country (SCImago)']||'N/A') + '</td>'
+      + '<td>' + link + '</td>'
+      + '</tr>';
+  });
+  
+  attachTooltipEvents();
+}
+
+async function fetchData() {
+  const res = await fetch('/data');
+  let data = await res.json();
+  
+  // Assign original indices so sorting doesn't lose the '#' number
+  data.forEach((row, i) => { row.originalIndex = i + 1; });
+  
+  currentData = data;
+  if (sortCol !== -1) {
+    applySort();
+  } else {
+    renderTable();
+  }
+}
+
+// ── Sorting ────────────────────────────────────────────────────────────────
+const sortKeys = [
+  'originalIndex', 'Title', 'Year', 'Journal/Venue (Scholar)', 'Quartile (SCImago)', 
+  'H-index (SCImago)', 'SJR Score (SCImago)', 'Citations Count', 'Publisher', 'Open Access', 'Country (SCImago)'
+];
+
+function sortTable(colIndex, type) {
+  if (sortCol === colIndex) {
+    sortAsc = !sortAsc;
+  } else {
+    sortCol = colIndex;
+    sortAsc = true;
+  }
+  
+  // Update header arrows
+  document.querySelectorAll('th').forEach(th => th.classList.remove('sort-asc', 'sort-desc'));
+  const activeTh = document.querySelectorAll('th')[colIndex];
+  activeTh.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+  
+  applySort();
+}
+
+function applySort() {
+  const key = sortKeys[sortCol];
+  currentData.sort((a, b) => {
+    let valA = a[key] || '';
+    let valB = b[key] || '';
+    
+    // Convert to numbers if possible for numeric columns
+    if (sortCol === 0 || sortCol === 2 || sortCol === 5 || sortCol === 6 || sortCol === 7) {
+      valA = parseFloat(String(valA).replace(',', '.')) || 0;
+      valB = parseFloat(String(valB).replace(',', '.')) || 0;
+      return sortAsc ? valA - valB : valB - valA;
+    }
+    
+    // String sort
+    valA = String(valA).toLowerCase();
+    valB = String(valB).toLowerCase();
+    if (valA < valB) return sortAsc ? -1 : 1;
+    if (valA > valB) return sortAsc ? 1 : -1;
+    return 0;
+  });
+  renderTable();
+}
+
+// ── Tooltip ────────────────────────────────────────────────────────────────
+function attachTooltipEvents() {
+  const tooltip = document.getElementById('tooltip');
+  
+  document.querySelectorAll('.title-cell').forEach(cell => {
+    cell.addEventListener('mouseenter', (e) => {
+      const t = e.target.dataset.fulltitle;
+      const a = e.target.dataset.abstract;
+      tooltip.innerHTML = '<strong>' + t + '</strong><br><br>' + a;
+      tooltip.classList.add('visible');
+    });
+    
+    cell.addEventListener('mousemove', (e) => {
+      const box = tooltip.getBoundingClientRect();
+      let left = e.clientX + 15;
+      let top = e.clientY + 15;
+      
+      // Prevent tooltip from overflowing the right of the screen
+      if (left + box.width > window.innerWidth) {
+        left = e.clientX - box.width - 15;
+        if (left < 15) left = 15;
+      }
+      
+      // Prevent tooltip from overflowing the bottom of the screen
+      if (top + box.height > window.innerHeight) {
+        top = e.clientY - box.height - 15;
+        if (top < 15) top = 15;
+      }
+      
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+    });
+    
+    cell.addEventListener('mouseleave', () => {
+      tooltip.classList.remove('visible');
+    });
+  });
+}
+
+fetchData();
+setInterval(fetchData, 5000);
+</script>
+</body>
+</html>

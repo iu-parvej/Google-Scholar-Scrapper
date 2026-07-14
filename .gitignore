@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Data Folder (Exclude all scraped results, but keep the directory template)
+Data Folder/*
+!Data Folder/.gitkeep
+river_erosion_papers.csv
+page2_response.html
+
+# IDE / System files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

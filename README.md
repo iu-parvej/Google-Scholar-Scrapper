@@ -1,20 +1,16 @@
-# Google Scholar Scraper & Quality Filtering Dashboard (v1.0.1)
+# Google Scholar Scraper & Quality Filtering Dashboard (v1.0.2)
 
 An enterprise-grade, web-based dashboard and automation engine to search, scrape, and filter Google Scholar articles. It features robust integration with the **Tor Network** for self-healing SOCKS5 proxy rotation, automatically bypassing Google's anti-bot blocks and pagination limits.
 
 ## 🚀 Key Features
 
+*   **Automated PDF Downloader Pipeline**: Downloads PDFs in 2 stages:
+    *   **Direct Google Scholar Links**: Sourced directly from `eprint_url` if indexed.
+    *   **Sci-Hub Fallback**: Automatically queries the `sci-hub.sidesgame.com` mirror using DOIs to scrape and download the PDF.
+*   **Query-Specific Run Directories**: Automatically structures output runs into `Data Folder/scrape_{query}_{timestamp}/` containing the CSV file and all downloaded PDF files.
+*   **Safe Filename Sanitization**: Automatically renames downloaded PDFs using cleaned paper titles. All special symbols (`.`, `-`, `:`, `/`, etc.) are stripped and replaced with underscores (`_`) to ensure perfect OS compatibility.
+*   **Hybrid Links Layout**: The preview page links column renders only the `PAGE` button and a toggle: either the green `PDF` button (if downloaded successfully) or a grey `RG SEARCH` button (pointing to a Google search on ResearchGate for manual human verification and 1-click download).
 *   **Advanced Query Builder**: Build complex boolean queries (supporting `MUST`, `AND`, `OR` operators) directly from the visual interface.
-*   **Tor Circuit Rotation**: Automatically rotates Tor exit nodes using the Tor control port (`9151`) on detecting soft-blocks or captcha pages.
-*   **Resilient Pagination**: Syncs search offset states (`start_index`) to resume scraping seamlessly exactly where it was interrupted after an IP rotation.
-*   **Duplicate Elimination**: Automatically filters overlapping search results in real-time, ensuring unique outputs in final CSV records.
-*   **Academic Quality Filters**:
-    *   Filter by **SCImago Journal Rank (SJR)**, Quartile rankings (`Q1` to `Q4`), and H-index via local database matching.
-    *   Filter by minimum citation counts.
-    *   Filter by Open Access status.
-    *   Whitelist specific journals or publishers.
-*   **Live Output Terminal**: Simulates a live CLI output stream directly in the web browser using Server-Sent Events (SSE).
-*   **Live Data Table**: Sortable tabular view of scraped papers with interactive abstract hover tooltips.
 
 ---
 

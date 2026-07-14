@@ -1,5 +1,6 @@
 from scholarly import scholarly, ProxyGenerator
 from scholarly._navigator import Navigator
+from bs4 import BeautifulSoup
 import time
 import csv
 import stem.control
@@ -280,6 +281,79 @@ def passes_filters(row_data, filters):
 
     return True, None
 
+
+# ── PDF Downloader Helpers ─────────────────────────────────────────────────────
+def sanitize_filename(title):
+    """
+    Cleans the title so that it only contains alphanumeric characters and underscores,
+    preventing any file system exceptions (dot, hyphens, slashes, or other special signs).
+    """
+    cleaned = re.sub(r'[^a-zA-Z0-9\s_]', ' ', title)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    cleaned = cleaned.replace(' ', '_')
+    # Limit length to 100 characters to prevent path limit errors on Windows
+    cleaned = cleaned[:100].strip('_')
+    return cleaned + ".pdf"
+
+
+def download_file(url, dest_path, headers=None, verify=True, timeout=20):
+    """Downloads a file and checks if the output is a valid PDF."""
+    try:
+        resp = requests.get(url, headers=headers, timeout=timeout, verify=verify)
+        if resp.status_code == 200 and resp.content.startswith(b'%PDF'):
+            with open(dest_path, "wb") as f:
+                f.write(resp.content)
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def get_sidesgame_pdf_url(doi):
+    """Queries the sidesgame Sci-Hub mirror to get the direct PDF link for a DOI."""
+    if not doi or doi == "N/A":
+        return None
+    url = f"https://sci-hub.sidesgame.com/{doi}"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml',
+        'Accept-Language': 'en-US,en;q=0.5'
+    }
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            # 1. Search for embed
+            embed = soup.find('embed', type='application/pdf')
+            if embed and embed.get('src'):
+                pdf_url = embed['src']
+                if pdf_url.startswith('//'):
+                    pdf_url = "https:" + pdf_url
+                return pdf_url
+            
+            # 2. Search for iframe
+            iframe = soup.find('iframe', id='pdf')
+            if iframe and iframe.get('src'):
+                pdf_url = iframe['src']
+                if pdf_url.startswith('//'):
+                    pdf_url = "https:" + pdf_url
+                return pdf_url
+            
+            # 3. Search for button locations
+            for btn in soup.find_all('button', onclick=re.compile(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]")):
+                onclick = btn['onclick']
+                onclick = onclick.replace('\\/', '/').replace('\\', '')
+                match = re.search(r"location\.href\s*=\s*['\"]([^'\"]+)['\"]", onclick)
+                if match:
+                    pdf_url = match.group(1)
+                    if pdf_url.startswith('//'):
+                        pdf_url = "https:" + pdf_url
+                    return pdf_url
+    except Exception:
+        pass
+    return None
+
+
 # ── Main scraper ───────────────────────────────────────────────────────────────
 def search_scholar(query, output_file=None, target_count=20,
                    year_low=None, year_high=None,
@@ -455,9 +529,41 @@ def search_scholar(query, output_file=None, target_count=20,
                     if full_abstract and len(full_abstract) > 20:
                         row["Abstract/Snippet"] = full_abstract
                 
+                # ── PDF Downloader Pipeline ──────────────────────────────────────────
+                output_dir = os.path.dirname(output_file)
+                pdf_filename = sanitize_filename(title)
+                pdf_filepath = os.path.join(output_dir, pdf_filename)
+                
+                downloaded = False
+                dl_headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+                
+                # Step 1: Direct Google Scholar PDF link
+                if pdf_url and pdf_url != 'N/A' and pdf_url.startswith('http'):
+                    my_print(f"    -> [PDF] Downloading via direct Scholar link...")
+                    if download_file(pdf_url, pdf_filepath, headers=dl_headers):
+                        downloaded = True
+                        my_print(f"    ✅ PDF downloaded successfully: {pdf_filename}")
+                
+                # Step 2: Sci-Hub Fallback using DOI
+                if not downloaded and row.get('DOI') and row.get('DOI') != 'N/A':
+                    my_print(f"    -> [PDF] Attempting Sci-Hub mirror download...")
+                    sh_pdf_url = get_sidesgame_pdf_url(row['DOI'])
+                    if sh_pdf_url:
+                        sh_headers = dl_headers.copy()
+                        sh_headers['Referer'] = 'https://sci-hub.sidesgame.com/'
+                        if download_file(sh_pdf_url, pdf_filepath, headers=sh_headers):
+                            downloaded = True
+                            my_print(f"    ✅ PDF downloaded successfully via Sci-Hub: {pdf_filename}")
+                
+                if not downloaded:
+                    my_print("    ❌ No free PDF downloaded for this paper.")
+
                 qualified += 1
                 my_print(f"[{qualified}/{target_count}] Title: {title}")
                 my_print(f"    Year: {year} | DOI: {crmeta['DOI']} | Quartile: {sjr_q} | Publisher: {crmeta['Publisher']}")
+
 
                 writer.writerow(row)
                 file.flush()

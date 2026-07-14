@@ -75,11 +75,15 @@ def start_scrape():
     if publishers:
         filters['publishers'] = publishers
 
-    # ── Generate output filename ──────────────────────────────────────────────
+    # ── Generate output filename and directory ─────────────────────────────────
     clean_query = re.sub(r'[^a-zA-Z0-9]', '_', query)[:20]
     timestamp   = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    folder_name = f"scrape_{clean_query}_{timestamp}"
+    run_dir     = os.path.join(BASE_DIR, "Data Folder", folder_name)
+    os.makedirs(run_dir, exist_ok=True)
+
     filename    = f"scrape_{clean_query}_{timestamp}.csv"
-    OUTPUT_CSV  = os.path.join(BASE_DIR, "Data Folder", filename)
+    OUTPUT_CSV  = os.path.join(run_dir, filename)
 
     def run_scraper():
         try:
@@ -128,13 +132,32 @@ def download():
         return send_file(OUTPUT_CSV, as_attachment=True)
     return "File not found", 404
 
+@app.route('/pdf/<folder>/<filename>')
+def serve_pdf(folder, filename):
+    pdf_path = os.path.join(BASE_DIR, "Data Folder", folder, filename)
+    if os.path.exists(pdf_path):
+        return send_file(pdf_path, mimetype='application/pdf')
+    return "PDF file not found", 404
+
 @app.route('/data')
 def get_data():
     if os.path.exists(OUTPUT_CSV):
         rows = []
+        run_dir = os.path.dirname(OUTPUT_CSV)
+        folder_name = os.path.basename(run_dir)
         with open(OUTPUT_CSV, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
+                # Check if PDF exists locally
+                title = row.get("Title", "")
+                cleaned = re.sub(r'[^a-zA-Z0-9\s_]', ' ', title)
+                cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+                cleaned = cleaned.replace(' ', '_')
+                pdf_filename = cleaned[:100].strip('_') + ".pdf"
+                
+                pdf_exists = os.path.exists(os.path.join(run_dir, pdf_filename))
+                row["pdf_exists"] = pdf_exists
+                row["pdf_url"] = f"/pdf/{folder_name}/{pdf_filename}" if pdf_exists else ""
                 rows.append(row)
         return jsonify(rows)
     return jsonify([])

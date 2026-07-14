@@ -45,6 +45,61 @@
     }
     #tooltip strong { color: #000000; font-weight: bold; font-size: 0.8rem; }
     #tooltip.visible { opacity: 1; }
+
+    /* Smart Action Badges */
+    .action-links {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .action-badge {
+      display: inline-block;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      padding: 3px 6px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: bold;
+      transition: all 0.15s;
+    }
+    /* Publisher Link */
+    .badge-pub {
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      background: transparent;
+    }
+    .badge-pub:hover {
+      background: var(--accent);
+      color: #ffffff;
+    }
+    /* Direct PDF Link */
+    .badge-pdf {
+      color: #ffffff;
+      background: var(--green);
+      border: 1px solid var(--green);
+    }
+    .badge-pdf:hover {
+      background: var(--green-hov);
+      border-color: var(--green-hov);
+    }
+    /* Sci-Hub Link */
+    .badge-scihub {
+      color: #ffffff;
+      background: var(--accent2);
+      border: 1px solid var(--accent2);
+    }
+    .badge-scihub:hover {
+      opacity: 0.9;
+    }
+    /* ResearchGate Link */
+    .badge-rg {
+      color: var(--text-muted);
+      border: 1px solid var(--input-bdr);
+      background: transparent;
+    }
+    .badge-rg:hover {
+      background: rgba(42,45,74,0.06);
+    }
   </style>
 </head>
 <body>
@@ -82,7 +137,7 @@
             <th onclick="sortTable(8, 'str')">PUBLISHER</th>
             <th onclick="sortTable(9, 'str')">OPEN ACCESS</th>
             <th onclick="sortTable(10, 'str')">COUNTRY</th>
-            <th>LINK</th>
+            <th>LINKS &amp; DOWNLOADS</th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -119,8 +174,23 @@ function renderTable() {
     const titleEsc = (row.Title||'N/A').replace(/"/g, '&quot;');
     const abstractEsc = (row['Abstract/Snippet']||'No abstract').replace(/"/g, '&quot;');
     
-    const link = row['Paper Link'] && row['Paper Link'] !== 'N/A'
-      ? '<a href="' + row['Paper Link'] + '" target="_blank" style="color:#3d5a99;">&#8599;</a>' : '—';
+    let actionsHtml = '<div class="action-links">';
+    
+    // 1. Publisher Link
+    if (row['Paper Link'] && row['Paper Link'] !== 'N/A') {
+      actionsHtml += '<a href="' + row['Paper Link'] + '" target="_blank" class="action-badge badge-pub" title="Publisher Website">PAGE</a>';
+    }
+    
+    // 2. Either Local PDF or ResearchGate Search
+    if (row['pdf_exists']) {
+      actionsHtml += '<a href="' + row['pdf_url'] + '" target="_blank" class="action-badge badge-pdf" title="Open Downloaded PDF in Browser">PDF</a>';
+    } else {
+      let searchVal = row['DOI'] && row['DOI'] !== 'N/A' ? row['DOI'] : row.Title;
+      let searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent(searchVal + ' site:researchgate.net');
+      actionsHtml += '<a href="' + searchUrl + '" target="_blank" class="action-badge badge-rg" title="Search ResearchGate on Google">RG SEARCH</a>';
+    }
+    
+    actionsHtml += '</div>';
       
     tbody.innerHTML += '<tr>'
       + '<td>' + (row.originalIndex) + '</td>'
@@ -135,7 +205,7 @@ function renderTable() {
       + '<td title="' + (row.Publisher||'').replace(/"/g, '&quot;') + '">' + (row.Publisher||'N/A').substring(0,22) + '</td>'
       + '<td>' + (row['Open Access']||'N/A') + '</td>'
       + '<td>' + (row['Country (SCImago)']||'N/A') + '</td>'
-      + '<td>' + link + '</td>'
+      + '<td>' + actionsHtml + '</td>'
       + '</tr>';
   });
   

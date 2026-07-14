@@ -1,4 +1,4 @@
-# Google Scholar Scraper & Quality Filtering Dashboard
+# Google Scholar Scraper & Quality Filtering Dashboard (v1.0.1)
 
 An enterprise-grade, web-based dashboard and automation engine to search, scrape, and filter Google Scholar articles. It features robust integration with the **Tor Network** for self-healing SOCKS5 proxy rotation, automatically bypassing Google's anti-bot blocks and pagination limits.
 
